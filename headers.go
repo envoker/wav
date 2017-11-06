@@ -1,46 +1,48 @@
 package wav
 
-const (
-	sizeofUint16 = 2
-	sizeofUint32 = 4
-
-	sizeofChunkId    = sizeofUint32
-	sizeofChunkSize  = sizeofUint32
-	sizeofRiffFormat = sizeofUint32
-
-	sizeofRiffHeader  = sizeofChunkId + sizeofChunkSize + sizeofRiffFormat
-	sizeofChunkHeader = sizeofChunkId + sizeofChunkSize
-
-	sizeofFmtData = sizeofUint16 + // AudioFormat
-		sizeofUint16 + // Channels
-		sizeofUint32 + // SampleRate
-		sizeofUint32 + // BytesPerSec
-		sizeofUint16 + // BytesPerBlock
-		sizeofUint16 // BitsPerSample
+import (
+	"encoding/binary"
 )
 
-type token [4]byte
+const (
+	sizeRiffFormat = 4 // WAVE
+)
 
 var (
-	token_RIFF = strToken("RIFF")
-	token_WAVE = strToken("WAVE")
-	token_fmt  = strToken("fmt ")
-	token_data = strToken("data")
+	sizeRiffHeader  = binary.Size(riffHeader{})
+	sizeChunkHeader = binary.Size(chunkHeader{})
+	sizeFmtData     = binary.Size(fmtData{})
 )
 
-func strToken(s string) (t token) {
-	copy(t[:], []byte(s))
-	return
-}
+type tag [4]byte
+
+//var (
+//	tag_RIFF = strToTag("RIFF")
+//	tag_WAVE = strToTag("WAVE")
+//	tag_fmt_ = strToTag("fmt ")
+//	tag_data = strToTag("data")
+//)
+
+//func strToTag(s string) (t tag) {
+//	copy(t[:], []byte(s))
+//	return
+//}
+
+var (
+	tag_RIFF = tag{'R', 'I', 'F', 'F'}
+	tag_WAVE = tag{'W', 'A', 'V', 'E'}
+	tag_fmt_ = tag{'f', 'm', 't', ' '}
+	tag_data = tag{'d', 'a', 't', 'a'}
+)
 
 type riffHeader struct {
-	Id     token
+	Id     tag
 	Size   uint32
-	Format token
+	Format tag
 }
 
 type chunkHeader struct {
-	Id   token
+	Id   tag
 	Size uint32
 }
 

@@ -267,69 +267,17 @@ func (sw *SampleWriter) WriteSample(sample float32) error {
 	return sw.s.writeSample(sw.w, sample)
 }
 
-func NewSampleWriter(w io.Writer, bytesPerSample int) (*SampleWriter, error) {
-	switch bytesPerSample {
-	case 1:
+func NewSampleWriter(w io.Writer, bitsPerSample int) (*SampleWriter, error) {
+	switch bitsPerSample {
+	case 8:
 		return &SampleWriter{w, new(int8Sampler)}, nil
-	case 2:
+	case 16:
 		return &SampleWriter{w, new(int16Sampler)}, nil
-	case 3:
+	case 24:
 		return &SampleWriter{w, new(int24Sampler)}, nil
-	case 4:
+	case 32:
 		return &SampleWriter{w, new(int32Sampler)}, nil
 	default:
-		return nil, errors.New("sample: BytesPerSample")
+		return nil, errors.New("sample: bitsPerSample")
 	}
 }
-
-/*
-type BlockWriter interface {
-	WriteBlock(block []float32) error
-}
-
-type BlockReader interface {
-	ReadBlock(block []float32) error
-}
-
-type blockWriter struct {
-	w  io.Writer
-	c  Config
-	sw SampleWriter
-}
-
-func NewBlockWriter(w io.Writer, c Config) (BlockWriter, error) {
-
-	if err := c.Error(); err != nil {
-		return nil, err
-	}
-
-	sw, err := NewSampleWriter(w, int(c.BytesPerSample))
-	if err != nil {
-		return nil, err
-	}
-
-	bw := &blockWriter{
-		w:  w,
-		c:  c,
-		sw: sw,
-	}
-
-	return bw, nil
-}
-
-func (this *blockWriter) WriteBlock(block []float32) (err error) {
-
-	if int(this.c.Channels) != len(block) {
-		err = newError("wrong Channels")
-		return
-	}
-
-	for _, sample := range block {
-		if err = this.sw.WriteSample(sample); err != nil {
-			return
-		}
-	}
-
-	return
-}
-*/

@@ -8,15 +8,15 @@ import (
 	"github.com/envoker/wav/sample"
 )
 
-func GenerateWave(fileName string, duration time.Duration, sampleRate float32, bytesPerSample int, samplers []sample.NextSampler) error {
+func GenerateWave(fileName string, duration time.Duration, sampleRate float32, bitsPerSample int, samplers []sample.NextSampler) error {
 
 	Tmax := float32(duration.Seconds())
 
 	c := wav.Config{
-		AudioFormat:    wav.WAVE_FORMAT_PCM,
-		Channels:       len(samplers),
-		SampleRate:     int(sampleRate),
-		BytesPerSample: bytesPerSample,
+		AudioFormat:   wav.WAVE_FORMAT_PCM,
+		Channels:      len(samplers),
+		SampleRate:    int(sampleRate),
+		BitsPerSample: bitsPerSample,
 	}
 
 	fw, err := wav.NewFileWriter(fileName, c)
@@ -27,7 +27,7 @@ func GenerateWave(fileName string, duration time.Duration, sampleRate float32, b
 
 	bw := bufio.NewWriterSize(fw, int(c.BytesPerSec()))
 
-	sw, err := sample.NewSampleWriter(bw, int(c.BytesPerSample))
+	sw, err := sample.NewSampleWriter(bw, int(c.BitsPerSample))
 	if err != nil {
 		return err
 	}

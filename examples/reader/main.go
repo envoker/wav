@@ -18,10 +18,10 @@ func main() {
 func TestWaveWrite(fileName string) {
 
 	c := wav.Config{
-		AudioFormat:    wav.WAVE_FORMAT_PCM,
-		Channels:       2,
-		SampleRate:     22050,
-		BytesPerSample: 2,
+		AudioFormat:   wav.WAVE_FORMAT_PCM,
+		Channels:      2,
+		SampleRate:    22050,
+		BitsPerSample: 16,
 	}
 
 	fw, err := wav.NewFileWriter(fileName, c)
@@ -42,15 +42,14 @@ func TestWaveWrite(fileName string) {
 
 func TestWaveRead(fileName string) {
 
-	var c wav.Config
-
-	fr, err := wav.NewFileReader(fileName, &c)
+	fr, err := wav.NewFileReader(fileName)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	defer fr.Close()
 
+	c, _ := fr.Config()
 	fmt.Printf("%+v\n", c)
 }
 

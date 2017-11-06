@@ -1,10 +1,10 @@
 package wav
 
 type Config struct {
-	AudioFormat    int // тип формата (1 - PCM; 6 - A-law, 7 - Mu-law)
-	Channels       int // количество каналов (1 - моно; 2 - стeрео)
-	SampleRate     int // частота дискретизации (8000, ...)
-	BytesPerSample int // 1, 2, 3, 4
+	AudioFormat   int // тип формата (1 - PCM; 6 - A-law, 7 - Mu-law)
+	Channels      int // количество каналов (1 - моно; 2 - стeрео)
+	SampleRate    int // частота дискретизации (8000, ...)
+	BitsPerSample int // [4..32]
 }
 
 func (c *Config) checkError() error {
@@ -21,9 +21,7 @@ func (c *Config) checkError() error {
 		return ErrSampleRate
 	}
 
-	switch c.BytesPerSample {
-	case 1, 2, 3, 4:
-	default:
+	if (c.BitsPerSample < 4) || (c.BitsPerSample > 32) {
 		return ErrBytesPerSample
 	}
 
@@ -31,11 +29,11 @@ func (c *Config) checkError() error {
 }
 
 func (c *Config) BytesPerSec() int {
-	return c.Channels * c.BytesPerSample * c.SampleRate
+	return c.Channels * c.SampleRate * c.BitsPerSample / 8
 }
 
 func (c *Config) BytesPerBlock() int {
-	return c.Channels * c.BytesPerSample
+	return c.Channels * c.BitsPerSample / 8
 }
 
 func configToFmtData(c Config) fmtData {
@@ -43,7 +41,7 @@ func configToFmtData(c Config) fmtData {
 		AudioFormat:   uint16(c.AudioFormat),
 		Channels:      uint16(c.Channels),
 		SampleRate:    uint32(c.SampleRate),
-		BitsPerSample: uint16(c.BytesPerSample * 8),
+		BitsPerSample: uint16(c.BitsPerSample),
 		BytesPerSec:   uint32(c.BytesPerSec()),
 		BytesPerBlock: uint16(c.BytesPerBlock()),
 	}
@@ -51,9 +49,9 @@ func configToFmtData(c Config) fmtData {
 
 func fmtDataToConfig(d fmtData) Config {
 	return Config{
-		AudioFormat:    int(d.AudioFormat),
-		Channels:       int(d.Channels),
-		SampleRate:     int(d.SampleRate),
-		BytesPerSample: int(d.BitsPerSample) / 8,
+		AudioFormat:   int(d.AudioFormat),
+		Channels:      int(d.Channels),
+		SampleRate:    int(d.SampleRate),
+		BitsPerSample: int(d.BitsPerSample),
 	}
 }

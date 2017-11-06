@@ -1,20 +1,18 @@
 package wav
 
 import (
-	"bufio"
 	"encoding/binary"
 	"io"
 	"os"
 )
 
 type FileReader struct {
-	config     Config
-	dataLength int64
-	file       *os.File
-	r          io.Reader
+	config Config
+	file   *os.File
+	r      io.Reader
 }
 
-func NewFileReader(fileName string, config *Config) (*FileReader, error) {
+func NewFileReader(fileName string) (*FileReader, error) {
 
 	file, err := os.Open(fileName)
 	if err != nil {
@@ -22,15 +20,12 @@ func NewFileReader(fileName string, config *Config) (*FileReader, error) {
 	}
 
 	fr := &FileReader{
-		dataLength: 0,
-		file:       file,
+		file: file,
 	}
 
 	if err = fr.readChunks(); err != nil {
 		return nil, err
 	}
-
-	*config = fr.config
 
 	return fr, nil
 }
@@ -43,37 +38,15 @@ func (fr *FileReader) Close() error {
 
 	err := fr.file.Close()
 	fr.file = nil
-	fr.dataLength = 0
 	return err
-}
-
-func (fr *FileReader) prevRead(data []byte) (n int, err error) {
-
-	if fr.dataLength == 0 {
-		return 0, nil
-	}
-
-	n = len(data)
-	if n > int(fr.dataLength) {
-		n = int(fr.dataLength)
-	}
-
-	n, err = fr.file.Read(data[:n])
-	if err != nil {
-		return 0, err
-	}
-
-	fr.dataLength -= int64(n)
-
-	return
 }
 
 func (fr *FileReader) Read(data []byte) (n int, err error) {
 	return fr.r.Read(data)
 }
 
-func (fr *FileReader) getConfig(c *Config) {
-	*c = fr.config
+func (fr *FileReader) Config() (Config, error) {
+	return fr.config, nil
 }
 
 type chunkLoc struct {
@@ -89,27 +62,23 @@ func (fr *FileReader) readChunks() error {
 	}
 
 	var pos int64
-	var riff_h riffHeader
+	var rh riffHeader
 
-	err = binary.Read(fr.file, binary.LittleEndian, &riff_h)
+	err = binary.Read(fr.file, binary.LittleEndian, &rh)
 	if err != nil {
 		return err
 	}
-	pos += sizeofRiffHeader
+	pos += int64(sizeRiffHeader)
 
-	if riff_h.Id != token_RIFF {
+	if rh.Id != tag_RIFF {
 		return ErrFileFormat
 	}
-	if riff_h.Format != token_WAVE {
+	if rh.Format != tag_WAVE {
 		return ErrFileFormat
 	}
-	fileSize := int64(riff_h.Size) + sizeofChunkHeader
+	fileSize := int64(sizeRiffHeader-sizeRiffFormat) + int64(rh.Size)
 
-	//fmt.Printf("riff id: <%s>\n", riff_h.Id)
-	//fmt.Printf("format: <%s>\n", riff_h.Format)
-	//fmt.Printf("chunk id: <%s>\n", token_WAVE)
-
-	var chunks = make(map[token]*chunkLoc)
+	var chunks = make(map[tag]*chunkLoc)
 	var ch chunkHeader
 
 	for {
@@ -120,30 +89,28 @@ func (fr *FileReader) readChunks() error {
 			}
 			return err
 		}
-		pos += sizeofChunkHeader // chunk header
+		pos += int64(sizeChunkHeader)
 
-		c := chunkLoc{
+		cl := chunkLoc{
 			pos:  pos,
 			size: int64(ch.Size),
 		}
 
-		//fmt.Printf("chunk id: <%s>\n", ch.Id)
-
-		_, err = fr.file.Seek(c.size, os.SEEK_CUR)
+		_, err = fr.file.Seek(cl.size, os.SEEK_CUR)
 		if err != nil {
 			return err
 		}
-		pos += c.size // chunk data
+		pos += cl.size // chunk data
 
-		chunks[ch.Id] = &c
+		chunks[ch.Id] = &cl
 	}
 
 	if pos != fileSize {
 		return ErrFileFormat
 	}
 
-	// fmt
-	chunkFmt, ok := chunks[token_fmt]
+	// fmt_
+	chunkFmt, ok := chunks[tag_fmt_]
 	if !ok {
 		return ErrFileFormat
 	}
@@ -153,7 +120,7 @@ func (fr *FileReader) readChunks() error {
 	}
 
 	// data
-	chunkData, ok := chunks[token_data]
+	chunkData, ok := chunks[tag_data]
 	if !ok {
 		return ErrFileFormat
 	}
@@ -166,7 +133,7 @@ func (fr *FileReader) readChunks() error {
 }
 
 func (fr *FileReader) readChunkFmt(cl *chunkLoc) error {
-	_, err := fr.file.Seek(int64(cl.pos), os.SEEK_SET)
+	_, err := fr.file.Seek(cl.pos, os.SEEK_SET)
 	if err != nil {
 		return err
 	}
@@ -180,13 +147,40 @@ func (fr *FileReader) readChunkFmt(cl *chunkLoc) error {
 }
 
 func (fr *FileReader) readChunkData(cl *chunkLoc) error {
-	_, err := fr.file.Seek(int64(cl.pos), os.SEEK_SET)
+	_, err := fr.file.Seek(cl.pos, os.SEEK_SET)
 	if err != nil {
 		return err
 	}
-	fr.dataLength = cl.size
-
-	fr.r = bufio.NewReaderSize(fr.file, int(cl.size))
-
+	fr.r = newLimitReader(fr.file, int(cl.size))
+	//fr.r = bufio.NewReaderSize(fr.file, int(cl.size))
 	return nil
+}
+
+type limitReader struct {
+	r          io.Reader
+	dataLength int
+}
+
+func newLimitReader(r io.Reader, n int) *limitReader {
+	return &limitReader{
+		r:          r,
+		dataLength: n,
+	}
+}
+
+func (lr *limitReader) Read(data []byte) (n int, err error) {
+
+	if lr.dataLength == 0 {
+		return 0, nil
+	}
+
+	n = len(data)
+	if n > lr.dataLength {
+		n = lr.dataLength
+	}
+
+	n, err = lr.r.Read(data[:n])
+	lr.dataLength -= n
+
+	return n, err
 }

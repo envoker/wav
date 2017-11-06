@@ -63,9 +63,9 @@ func (fw *FileWriter) writeConfig() error {
 	//----------------------------------------
 	// RIFF header
 	riff_h := riffHeader{
-		Id:     token_RIFF,
+		Id:     tag_RIFF,
 		Size:   0,
-		Format: token_WAVE,
+		Format: tag_WAVE,
 	}
 	err = binary.Write(fw.file, binary.LittleEndian, riff_h)
 	if err != nil {
@@ -73,16 +73,17 @@ func (fw *FileWriter) writeConfig() error {
 	}
 
 	//----------------------------------------
-	// fmt chunk
+	fmt_data := configToFmtData(fw.config)
+
+	// fmt_ chunk
 	fmt_h := chunkHeader{
-		Id:   token_fmt,
-		Size: sizeofFmtData,
+		Id:   tag_fmt_,
+		Size: uint32(sizeFmtData),
 	}
 	err = binary.Write(fw.file, binary.LittleEndian, fmt_h)
 	if err != nil {
 		return err
 	}
-	fmt_data := configToFmtData(fw.config)
 	err = binary.Write(fw.file, binary.LittleEndian, fmt_data)
 	if err != nil {
 		return err
@@ -91,7 +92,7 @@ func (fw *FileWriter) writeConfig() error {
 	//----------------------------------------
 	// data chunk
 	data_h := chunkHeader{
-		Id:   token_data,
+		Id:   tag_data,
 		Size: 0,
 	}
 	err = binary.Write(fw.file, binary.LittleEndian, data_h)
@@ -109,15 +110,15 @@ func (fw *FileWriter) writeDataLength() error {
 		return err
 	}
 
-	size_fmtChunk := uint32(sizeofChunkHeader + sizeofFmtData)
-	size_dataChunk := uint32(sizeofChunkHeader + fw.dataLength)
-	riff_size := sizeofRiffFormat + size_fmtChunk + size_dataChunk
+	var riff_size = sizeRiffFormat
+	riff_size += sizeChunkHeader + sizeFmtData        // fmt_ chunk
+	riff_size += sizeChunkHeader + int(fw.dataLength) // data chunk
 
 	// RIFF header
 	riff_h := riffHeader{
-		Id:     token_RIFF,
-		Size:   riff_size,
-		Format: token_WAVE,
+		Id:     tag_RIFF,
+		Size:   uint32(riff_size),
+		Format: tag_WAVE,
 	}
 	err = binary.Write(fw.file, binary.LittleEndian, riff_h)
 	if err != nil {
@@ -125,13 +126,13 @@ func (fw *FileWriter) writeDataLength() error {
 	}
 
 	// data chunk
-	_, err = fw.file.Seek(int64(size_fmtChunk), os.SEEK_CUR)
+	_, err = fw.file.Seek(int64(sizeChunkHeader+sizeFmtData), os.SEEK_CUR)
 	if err != nil {
 		return err
 	}
 
 	data_h := chunkHeader{
-		Id:   token_data,
+		Id:   tag_data,
 		Size: fw.dataLength,
 	}
 	err = binary.Write(fw.file, binary.LittleEndian, data_h)
