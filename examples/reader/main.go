@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/envoker/wav"
@@ -26,8 +27,7 @@ func TestWaveWrite(fileName string) {
 
 	fw, err := wav.NewFileWriter(fileName, c)
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
 	defer fw.Close()
 
@@ -44,13 +44,11 @@ func TestWaveRead(fileName string) {
 
 	fr, err := wav.NewFileReader(fileName)
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
 	defer fr.Close()
 
-	c, _ := fr.Config()
-	fmt.Printf("%+v\n", c)
+	fmt.Printf("%+v\n", fr.Config())
 }
 
 func TextFileHexDump(fileName string) error {

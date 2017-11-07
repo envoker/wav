@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const bytesPerSample = 3
+const bitsPerSample = 24
 
 func monoTone() error {
 
@@ -21,7 +21,7 @@ func monoTone() error {
 	}
 
 	samplers := MakeSamplers(gs, sampleRate)
-	return GenerateWave("./mono-tone.wav", time.Second*9, sampleRate, bytesPerSample, samplers)
+	return GenerateWave("./mono-tone.wav", time.Second*9, sampleRate, bitsPerSample, samplers)
 }
 
 func stereoTone() error {
@@ -42,7 +42,7 @@ func stereoTone() error {
 	}
 
 	samplers := MakeSamplers(gs, sampleRate)
-	return GenerateWave("./stereo-tone.wav", time.Second*13, sampleRate, bytesPerSample, samplers)
+	return GenerateWave("./stereo-tone.wav", time.Second*13, sampleRate, bitsPerSample, samplers)
 }
 
 func multiTone() error {
@@ -73,7 +73,7 @@ func multiTone() error {
 	}
 
 	samplers := MakeSamplers(gs, sampleRate)
-	return GenerateWave("./multi-tone.wav", time.Second*7, sampleRate, bytesPerSample, samplers)
+	return GenerateWave("./multi-tone.wav", time.Second*7, sampleRate, bitsPerSample, samplers)
 }
 
 func main() {

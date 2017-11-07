@@ -2,51 +2,55 @@ package wav
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 	"os"
 )
 
 type FileReader struct {
-	config Config
-	file   *os.File
-	r      io.Reader
+	config     Config
+	file       *os.File
+	dataLength int
 }
 
 func NewFileReader(fileName string) (*FileReader, error) {
-
 	file, err := os.Open(fileName)
 	if err != nil {
 		return nil, err
 	}
-
-	fr := &FileReader{
-		file: file,
-	}
-
+	fr := &FileReader{file: file}
 	if err = fr.readChunks(); err != nil {
+		file.Close()
 		return nil, err
 	}
-
 	return fr, nil
 }
 
 func (fr *FileReader) Close() error {
-
 	if fr.file == nil {
 		return ErrFileReaderClosed
 	}
-
 	err := fr.file.Close()
 	fr.file = nil
+	fr.dataLength = 0
 	return err
 }
 
 func (fr *FileReader) Read(data []byte) (n int, err error) {
-	return fr.r.Read(data)
+	if fr.dataLength == 0 {
+		return 0, nil
+	}
+	n = len(data)
+	if n > fr.dataLength {
+		n = fr.dataLength
+	}
+	n, err = fr.file.Read(data[:n])
+	fr.dataLength -= n
+	return n, err
 }
 
-func (fr *FileReader) Config() (Config, error) {
-	return fr.config, nil
+func (fr *FileReader) Config() Config {
+	return fr.config
 }
 
 type chunkLoc struct {
@@ -62,125 +66,112 @@ func (fr *FileReader) readChunks() error {
 	}
 
 	var pos int64
-	var rh riffHeader
+	var ch chunkHeader
 
-	err = binary.Read(fr.file, binary.LittleEndian, &rh)
+	//-----------------------------------------------------
+	// RIFF header
+	n, err := read(fr.file, binary.LittleEndian, &ch)
 	if err != nil {
 		return err
 	}
-	pos += int64(sizeRiffHeader)
+	pos += int64(n)
+	if ch.Id != tag_RIFF {
+		return ErrFileFormat
+	}
+	fileSize := int64(n) + int64(ch.Size)
 
-	if rh.Id != tag_RIFF {
-		return ErrFileFormat
+	//-----------------------------------------------------
+	// format WAVE
+	var format tag
+	n, err = read(fr.file, binary.LittleEndian, &format)
+	if err != nil {
+		return err
 	}
-	if rh.Format != tag_WAVE {
-		return ErrFileFormat
+	pos += int64(n)
+	if format != tag_WAVE {
+		return errors.New("wav: format is not WAVE")
 	}
-	fileSize := int64(sizeRiffHeader-sizeRiffFormat) + int64(rh.Size)
+
+	//-----------------------------------------------------
+	// read all chunks
 
 	var chunks = make(map[tag]*chunkLoc)
-	var ch chunkHeader
 
 	for {
-		err = binary.Read(fr.file, binary.LittleEndian, &ch)
+		n, err = read(fr.file, binary.LittleEndian, &ch)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return err
 		}
-		pos += int64(sizeChunkHeader)
+		pos += int64(n)
 
-		cl := chunkLoc{
+		loc := chunkLoc{
 			pos:  pos,
 			size: int64(ch.Size),
 		}
 
-		_, err = fr.file.Seek(cl.size, os.SEEK_CUR)
+		_, err = fr.file.Seek(loc.size, os.SEEK_CUR)
 		if err != nil {
 			return err
 		}
-		pos += cl.size // chunk data
+		pos += loc.size // chunk data
 
-		chunks[ch.Id] = &cl
+		chunks[ch.Id] = &loc
 	}
 
+	// check file size
 	if pos != fileSize {
 		return ErrFileFormat
 	}
 
-	// fmt_
-	chunkFmt, ok := chunks[tag_fmt_]
+	//-----------------------------------------------------
+	// chunk fmt_
+	loc, ok := chunks[tag_fmt_]
 	if !ok {
-		return ErrFileFormat
+		return errors.New("wav: has not chunk \"fmt \"")
 	}
-	err = fr.readChunkFmt(chunkFmt)
+	_, err = fr.file.Seek(loc.pos, os.SEEK_SET)
 	if err != nil {
 		return err
 	}
+	var fmt_data fmtData
+	err = binary.Read(fr.file, binary.LittleEndian, &fmt_data)
+	if err != nil {
+		return err
+	}
+	fr.config = fmtDataToConfig(fmt_data)
 
-	// data
-	chunkData, ok := chunks[tag_data]
+	//-----------------------------------------------------
+	// chunk data
+	loc, ok = chunks[tag_data]
 	if !ok {
-		return ErrFileFormat
+		return errors.New("wav: has not chunk \"data\"")
 	}
-	err = fr.readChunkData(chunkData)
+	_, err = fr.file.Seek(loc.pos, os.SEEK_SET)
 	if err != nil {
 		return err
 	}
+	fr.dataLength = int(loc.size)
 
 	return nil
 }
 
-func (fr *FileReader) readChunkFmt(cl *chunkLoc) error {
-	_, err := fr.file.Seek(cl.pos, os.SEEK_SET)
-	if err != nil {
-		return err
-	}
-	var c_data fmtData
-	err = binary.Read(fr.file, binary.LittleEndian, &c_data)
-	if err != nil {
-		return err
-	}
-	fr.config = fmtDataToConfig(c_data)
-	return nil
+func read(r io.Reader, order binary.ByteOrder, data interface{}) (n int, err error) {
+	cr := &countReader{r: r}
+	err = binary.Read(cr, order, data)
+	n = cr.n
+	return
 }
 
-func (fr *FileReader) readChunkData(cl *chunkLoc) error {
-	_, err := fr.file.Seek(cl.pos, os.SEEK_SET)
-	if err != nil {
-		return err
-	}
-	fr.r = newLimitReader(fr.file, int(cl.size))
-	//fr.r = bufio.NewReaderSize(fr.file, int(cl.size))
-	return nil
+type countReader struct {
+	r io.Reader
+	n int
 }
 
-type limitReader struct {
-	r          io.Reader
-	dataLength int
-}
-
-func newLimitReader(r io.Reader, n int) *limitReader {
-	return &limitReader{
-		r:          r,
-		dataLength: n,
-	}
-}
-
-func (lr *limitReader) Read(data []byte) (n int, err error) {
-
-	if lr.dataLength == 0 {
-		return 0, nil
-	}
-
-	n = len(data)
-	if n > lr.dataLength {
-		n = lr.dataLength
-	}
-
-	n, err = lr.r.Read(data[:n])
-	lr.dataLength -= n
-
-	return n, err
+func (p *countReader) Read(data []byte) (n int, err error) {
+	n, err = p.r.Read(data)
+	p.n += n
+	return
 }

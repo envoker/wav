@@ -263,7 +263,6 @@ type SampleWriter struct {
 }
 
 func (sw *SampleWriter) WriteSample(sample float32) error {
-
 	return sw.s.writeSample(sw.w, sample)
 }
 

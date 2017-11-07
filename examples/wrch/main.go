@@ -29,7 +29,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c2, _ := fr.Config()
+	c2 := fr.Config()
 
 	var data [64]byte
 	n, err := fr.Read(data[:])

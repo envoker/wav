@@ -2,6 +2,7 @@ package wav
 
 import (
 	"encoding/binary"
+	"io"
 	"os"
 )
 
@@ -11,13 +12,13 @@ type FileWriter struct {
 	file       *os.File
 }
 
-func NewFileWriter(fileName string, config Config) (*FileWriter, error) {
+func NewFileWriter(filename string, config Config) (*FileWriter, error) {
 
 	if err := config.checkError(); err != nil {
 		return nil, err
 	}
 
-	file, err := os.Create(fileName)
+	file, err := os.Create(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -62,25 +63,31 @@ func (fw *FileWriter) writeConfig() error {
 
 	//----------------------------------------
 	// RIFF header
-	riff_h := riffHeader{
-		Id:     tag_RIFF,
-		Size:   0,
-		Format: tag_WAVE,
+	ch := chunkHeader{
+		Id:   tag_RIFF,
+		Size: 0,
 	}
-	err = binary.Write(fw.file, binary.LittleEndian, riff_h)
+	err = binary.Write(fw.file, binary.LittleEndian, ch)
 	if err != nil {
 		return err
 	}
 
 	//----------------------------------------
-	fmt_data := configToFmtData(fw.config)
-
-	// fmt_ chunk
-	fmt_h := chunkHeader{
-		Id:   tag_fmt_,
-		Size: uint32(sizeFmtData),
+	// format WAVE
+	var format = tag_WAVE
+	err = binary.Write(fw.file, binary.LittleEndian, format)
+	if err != nil {
+		return err
 	}
-	err = binary.Write(fw.file, binary.LittleEndian, fmt_h)
+
+	//----------------------------------------
+	// chunk fmt_
+	fmt_data := configToFmtData(fw.config)
+	ch = chunkHeader{
+		Id:   tag_fmt_,
+		Size: uint32(binary.Size(fmt_data)),
+	}
+	err = binary.Write(fw.file, binary.LittleEndian, ch)
 	if err != nil {
 		return err
 	}
@@ -90,12 +97,12 @@ func (fw *FileWriter) writeConfig() error {
 	}
 
 	//----------------------------------------
-	// data chunk
-	data_h := chunkHeader{
+	// chunk data
+	ch = chunkHeader{
 		Id:   tag_data,
 		Size: 0,
 	}
-	err = binary.Write(fw.file, binary.LittleEndian, data_h)
+	err = binary.Write(fw.file, binary.LittleEndian, ch)
 	if err != nil {
 		return err
 	}
@@ -110,35 +117,62 @@ func (fw *FileWriter) writeDataLength() error {
 		return err
 	}
 
-	var riff_size = sizeRiffFormat
-	riff_size += sizeChunkHeader + sizeFmtData        // fmt_ chunk
-	riff_size += sizeChunkHeader + int(fw.dataLength) // data chunk
+	var ch chunkHeader
+	chunkHeaderSize := binary.Size(ch)
+
+	var format = tag_WAVE
+	formatSize := binary.Size(format)
+
+	sizeFmtData := binary.Size(fmtData{})
+
+	var riff_size = formatSize /* riff format */ +
+		(chunkHeaderSize + sizeFmtData) /* chunk fmt_ */ +
+		(chunkHeaderSize + int(fw.dataLength)) /* chunk data */
 
 	// RIFF header
-	riff_h := riffHeader{
-		Id:     tag_RIFF,
-		Size:   uint32(riff_size),
-		Format: tag_WAVE,
+	ch = chunkHeader{
+		Id:   tag_RIFF,
+		Size: uint32(riff_size),
 	}
-	err = binary.Write(fw.file, binary.LittleEndian, riff_h)
+	err = binary.Write(fw.file, binary.LittleEndian, ch)
 	if err != nil {
 		return err
 	}
 
 	// data chunk
-	_, err = fw.file.Seek(int64(sizeChunkHeader+sizeFmtData), os.SEEK_CUR)
+	pos := formatSize /* riff format */ +
+		(chunkHeaderSize + sizeFmtData) /* chunk fmt_ */
+	_, err = fw.file.Seek(int64(pos), os.SEEK_CUR)
 	if err != nil {
 		return err
 	}
 
-	data_h := chunkHeader{
+	ch = chunkHeader{
 		Id:   tag_data,
 		Size: fw.dataLength,
 	}
-	err = binary.Write(fw.file, binary.LittleEndian, data_h)
+	err = binary.Write(fw.file, binary.LittleEndian, ch)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func write(w io.Writer, order binary.ByteOrder, data interface{}) (n int, err error) {
+	cw := &countWriter{w: w}
+	err = binary.Write(cw, order, data)
+	n = cw.n
+	return
+}
+
+type countWriter struct {
+	w io.Writer
+	n int
+}
+
+func (p *countWriter) Write(data []byte) (n int, err error) {
+	n, err = p.w.Write(data)
+	p.n += n
+	return
 }

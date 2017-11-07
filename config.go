@@ -29,7 +29,7 @@ func (c *Config) checkError() error {
 }
 
 func (c *Config) BytesPerSec() int {
-	return c.Channels * c.SampleRate * c.BitsPerSample / 8
+	return c.SampleRate * c.Channels * c.BitsPerSample / 8
 }
 
 func (c *Config) BytesPerBlock() int {
@@ -41,9 +41,9 @@ func configToFmtData(c Config) fmtData {
 		AudioFormat:   uint16(c.AudioFormat),
 		Channels:      uint16(c.Channels),
 		SampleRate:    uint32(c.SampleRate),
-		BitsPerSample: uint16(c.BitsPerSample),
 		BytesPerSec:   uint32(c.BytesPerSec()),
 		BytesPerBlock: uint16(c.BytesPerBlock()),
+		BitsPerSample: uint16(c.BitsPerSample),
 	}
 }
 
