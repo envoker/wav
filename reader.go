@@ -38,7 +38,7 @@ func (fr *FileReader) Close() error {
 
 func (fr *FileReader) Read(data []byte) (n int, err error) {
 	if fr.dataLength == 0 {
-		return 0, nil
+		return 0, io.EOF
 	}
 	n = len(data)
 	if n > fr.dataLength {

@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/envoker/wav"
-	"github.com/envoker/wav/sample"
+	"github.com/envoker/wav/samples"
 )
 
-func GenerateWave(fileName string, duration time.Duration, sampleRate float32, bitsPerSample int, samplers []sample.NextSampler) error {
+func GenerateWave(fileName string, duration time.Duration, sampleRate float32, bitsPerSample int, samplers []NextSampler) error {
 
 	Tmax := float32(duration.Seconds())
 
@@ -25,17 +25,19 @@ func GenerateWave(fileName string, duration time.Duration, sampleRate float32, b
 	}
 	defer fw.Close()
 
-	bw := bufio.NewWriterSize(fw, int(c.BytesPerSec()))
+	bw := bufio.NewWriterSize(fw, c.BytesPerSec())
 
-	sw, err := sample.NewSampleWriter(bw, int(c.BitsPerSample))
+	srw, err := samples.NewSampler(c.BitsPerSample)
 	if err != nil {
 		return err
 	}
-
+	maxValue := samples.MaxSample(c.BitsPerSample)
+	maxValueFloat := float32(maxValue)
 	n := int(Tmax * sampleRate)
 	for i := 0; i < n; i++ {
 		for _, sampler := range samplers {
-			if err = sw.WriteSample(sampler.NextSample()); err != nil {
+			sample := int32(sampler.NextSample() * maxValueFloat)
+			if err = srw.WriteSample(fw, sample); err != nil {
 				return err
 			}
 		}

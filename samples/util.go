@@ -1,19 +1,12 @@
-package sample
+package samples
 
 import (
-	"errors"
 	"io"
 )
 
 func readAll(r io.Reader, data []byte) error {
-	n, err := r.Read(data)
-	if err != nil {
-		return err
-	}
-	if n < len(data) {
-		return errors.New("insufficient data length")
-	}
-	return nil
+	_, err := io.ReadFull(r, data)
+	return err
 }
 
 func writeAll(w io.Writer, data []byte) error {

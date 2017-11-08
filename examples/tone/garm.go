@@ -2,9 +2,11 @@ package main
 
 import (
 	"math"
-
-	"github.com/envoker/wav/sample"
 )
+
+type NextSampler interface {
+	NextSample() float32 // [-1 ... +1]
+}
 
 type Garmonica struct {
 	Amplitude, Frequency, Phase float32
@@ -27,7 +29,7 @@ func (ts *toneSampler) NextSample() float32 {
 	return sample
 }
 
-func NewToneSampler(g Garmonica, sampleRate float32) sample.NextSampler {
+func NewToneSampler(g Garmonica, sampleRate float32) NextSampler {
 	return &toneSampler{
 		amplitude: g.Amplitude,
 		phase:     g.Phase,
@@ -37,8 +39,8 @@ func NewToneSampler(g Garmonica, sampleRate float32) sample.NextSampler {
 	}
 }
 
-func MakeSamplers(gs []Garmonica, sampleRate float32) []sample.NextSampler {
-	samplers := make([]sample.NextSampler, len(gs))
+func MakeSamplers(gs []Garmonica, sampleRate float32) []NextSampler {
+	samplers := make([]NextSampler, len(gs))
 	for i, g := range gs {
 		samplers[i] = NewToneSampler(g, sampleRate)
 	}

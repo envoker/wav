@@ -4,7 +4,7 @@ type Config struct {
 	AudioFormat   int // тип формата (1 - PCM; 6 - A-law, 7 - Mu-law)
 	Channels      int // количество каналов (1 - моно; 2 - стeрео)
 	SampleRate    int // частота дискретизации (8000, ...)
-	BitsPerSample int // [4..32]
+	BitsPerSample int // [8, 16, 24, 32]
 }
 
 func (c *Config) checkError() error {
@@ -21,8 +21,10 @@ func (c *Config) checkError() error {
 		return ErrSampleRate
 	}
 
-	if (c.BitsPerSample < 4) || (c.BitsPerSample > 32) {
-		return ErrBytesPerSample
+	switch c.BitsPerSample {
+	case 8, 16, 24, 32:
+	default:
+		return ErrBitsPerSample
 	}
 
 	return nil
