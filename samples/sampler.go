@@ -14,13 +14,21 @@ type (
 		WriteSample(w io.Writer, sample int32) error
 	}
 
-	Sampler interface {
+	sampler interface {
 		SampleReader
 		SampleWriter
 	}
 )
 
-func NewSampler(bitsPerSample int) (Sampler, error) {
+func NewSampleReader(bitsPerSample int) (SampleReader, error) {
+	return newSampler(bitsPerSample)
+}
+
+func NewSampleWriter(bitsPerSample int) (SampleWriter, error) {
+	return newSampler(bitsPerSample)
+}
+
+func newSampler(bitsPerSample int) (sampler, error) {
 	switch bitsPerSample {
 	case 8:
 		return new(sampler8), nil
@@ -39,7 +47,7 @@ type sampler8 struct {
 	buf [1]byte
 }
 
-var _ Sampler = (*sampler8)(nil)
+var _ sampler = (*sampler8)(nil)
 
 func (p *sampler8) ReadSample(r io.Reader) (sample int32, err error) {
 	buf := p.buf[:]
@@ -62,7 +70,7 @@ type sampler16 struct {
 	buf [2]byte
 }
 
-var _ Sampler = (*sampler16)(nil)
+var _ sampler = (*sampler16)(nil)
 
 func (p *sampler16) ReadSample(r io.Reader) (sample int32, err error) {
 	buf := p.buf[:]
@@ -85,7 +93,7 @@ type sampler24 struct {
 	buf [3]byte
 }
 
-var _ Sampler = (*sampler24)(nil)
+var _ sampler = (*sampler24)(nil)
 
 func (p *sampler24) ReadSample(r io.Reader) (sample int32, err error) {
 	buf := p.buf[:]
@@ -108,7 +116,7 @@ type sampler32 struct {
 	buf [4]byte
 }
 
-var _ Sampler = (*sampler32)(nil)
+var _ sampler = (*sampler32)(nil)
 
 func (p *sampler32) ReadSample(r io.Reader) (sample int32, err error) {
 	buf := p.buf[:]

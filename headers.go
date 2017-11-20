@@ -1,5 +1,9 @@
 package wav
 
+import (
+	"encoding/binary"
+)
+
 type tag [4]byte
 
 var (
@@ -7,6 +11,12 @@ var (
 	tag_WAVE = tag{'W', 'A', 'V', 'E'} // "WAVE"
 	tag_fmt_ = tag{'f', 'm', 't', ' '} // "fmt "
 	tag_data = tag{'d', 'a', 't', 'a'} // "data"
+)
+
+var (
+	sizeChunkHeader = binary.Size(chunkHeader{})
+	sizeFmtData     = binary.Size(fmtData{})
+	sizeWaveFormat  = binary.Size(tag_WAVE)
 )
 
 type chunkHeader struct {

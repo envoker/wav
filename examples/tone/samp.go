@@ -27,7 +27,7 @@ func GenerateWave(fileName string, duration time.Duration, sampleRate float32, b
 
 	bw := bufio.NewWriterSize(fw, c.BytesPerSec())
 
-	srw, err := samples.NewSampler(c.BitsPerSample)
+	sw, err := samples.NewSampleWriter(c.BitsPerSample)
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func GenerateWave(fileName string, duration time.Duration, sampleRate float32, b
 	for i := 0; i < n; i++ {
 		for _, sampler := range samplers {
 			sample := int32(sampler.NextSample() * maxValueFloat)
-			if err = srw.WriteSample(fw, sample); err != nil {
+			if err = sw.WriteSample(fw, sample); err != nil {
 				return err
 			}
 		}

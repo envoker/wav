@@ -2,7 +2,6 @@ package wav
 
 import (
 	"encoding/binary"
-	"io"
 	"os"
 )
 
@@ -85,7 +84,7 @@ func (fw *FileWriter) writeConfig() error {
 	fmt_data := configToFmtData(fw.config)
 	ch = chunkHeader{
 		Id:   tag_fmt_,
-		Size: uint32(binary.Size(fmt_data)),
+		Size: uint32(sizeFmtData),
 	}
 	err = binary.Write(fw.file, binary.LittleEndian, ch)
 	if err != nil {
@@ -117,20 +116,12 @@ func (fw *FileWriter) writeDataLength() error {
 		return err
 	}
 
-	var ch chunkHeader
-	chunkHeaderSize := binary.Size(ch)
-
-	var format = tag_WAVE
-	formatSize := binary.Size(format)
-
-	sizeFmtData := binary.Size(fmtData{})
-
-	var riff_size = formatSize /* riff format */ +
-		(chunkHeaderSize + sizeFmtData) /* chunk fmt_ */ +
-		(chunkHeaderSize + int(fw.dataLength)) /* chunk data */
+	var riff_size = sizeWaveFormat /* riff format */ +
+		(sizeChunkHeader + sizeFmtData) /* chunk fmt_ */ +
+		(sizeChunkHeader + int(fw.dataLength)) /* chunk data */
 
 	// RIFF header
-	ch = chunkHeader{
+	ch := chunkHeader{
 		Id:   tag_RIFF,
 		Size: uint32(riff_size),
 	}
@@ -140,8 +131,8 @@ func (fw *FileWriter) writeDataLength() error {
 	}
 
 	// data chunk
-	pos := formatSize /* riff format */ +
-		(chunkHeaderSize + sizeFmtData) /* chunk fmt_ */
+	pos := sizeWaveFormat /* riff format */ +
+		(sizeChunkHeader + sizeFmtData) /* chunk fmt_ */
 	_, err = fw.file.Seek(int64(pos), os.SEEK_CUR)
 	if err != nil {
 		return err
@@ -157,22 +148,4 @@ func (fw *FileWriter) writeDataLength() error {
 	}
 
 	return nil
-}
-
-func write(w io.Writer, order binary.ByteOrder, data interface{}) (n int, err error) {
-	cw := &countWriter{w: w}
-	err = binary.Write(cw, order, data)
-	n = cw.n
-	return
-}
-
-type countWriter struct {
-	w io.Writer
-	n int
-}
-
-func (p *countWriter) Write(data []byte) (n int, err error) {
-	n, err = p.w.Write(data)
-	p.n += n
-	return
 }

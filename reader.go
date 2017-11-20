@@ -70,24 +70,24 @@ func (fr *FileReader) readChunks() error {
 
 	//-----------------------------------------------------
 	// RIFF header
-	n, err := read(fr.file, binary.LittleEndian, &ch)
+	err = binary.Read(fr.file, binary.LittleEndian, &ch)
 	if err != nil {
 		return err
 	}
-	pos += int64(n)
+	pos += int64(sizeChunkHeader)
 	if ch.Id != tag_RIFF {
 		return ErrFileFormat
 	}
-	fileSize := int64(n) + int64(ch.Size)
+	fileSize := int64(sizeChunkHeader) + int64(ch.Size)
 
 	//-----------------------------------------------------
 	// format WAVE
 	var format tag
-	n, err = read(fr.file, binary.LittleEndian, &format)
+	err = binary.Read(fr.file, binary.LittleEndian, &format)
 	if err != nil {
 		return err
 	}
-	pos += int64(n)
+	pos += int64(sizeWaveFormat)
 	if format != tag_WAVE {
 		return errors.New("wav: format is not WAVE")
 	}
@@ -98,14 +98,14 @@ func (fr *FileReader) readChunks() error {
 	var chunks = make(map[tag]*chunkLoc)
 
 	for {
-		n, err = read(fr.file, binary.LittleEndian, &ch)
+		err = binary.Read(fr.file, binary.LittleEndian, &ch)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return err
 		}
-		pos += int64(n)
+		pos += int64(sizeChunkHeader)
 
 		loc := chunkLoc{
 			pos:  pos,
@@ -156,22 +156,4 @@ func (fr *FileReader) readChunks() error {
 	fr.dataLength = int(loc.size)
 
 	return nil
-}
-
-func read(r io.Reader, order binary.ByteOrder, data interface{}) (n int, err error) {
-	cr := &countReader{r: r}
-	err = binary.Read(cr, order, data)
-	n = cr.n
-	return
-}
-
-type countReader struct {
-	r io.Reader
-	n int
-}
-
-func (p *countReader) Read(data []byte) (n int, err error) {
-	n, err = p.r.Read(data)
-	p.n += n
-	return
 }
